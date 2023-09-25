@@ -31,6 +31,13 @@ struct Box{
     vec3 maxi;
 };
 
+struct Cylindre{
+    vec3 r;
+    vec3 h;
+    int i;
+    
+};
+
 float Checkers(in vec2 p)
 {
     // Filter kernel
@@ -137,6 +144,13 @@ bool IntersectBox(Ray ray, Box box, out Hit x){
     
     x.n = normalize(ray.o + ray.d * tMin - (box.mini + box.maxi) * 0.5);
 
+
+    return true;
+}
+
+bool IntersectCylindre(Ray ray, Cylindre cy, out Hit x){
+
+    for(int i = 0; i < 3 ; i++){}
 
     return true;
 }
