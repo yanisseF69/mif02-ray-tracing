@@ -31,6 +31,14 @@ struct Box{
     vec3 maxi;
 };
 
+struct Cylinder{
+    vec3 c; //center
+    float r; //radius
+    float h; //heigth
+    int i;
+    
+};
+
 float Checkers(in vec2 p)
 {
     // Filter kernel
@@ -141,6 +149,58 @@ bool IntersectBox(Ray ray, Box box, out Hit x){
     return true;
 }
 
+bool IntersectCylinder(Ray ray, Cylinder cy, out Hit h){
+    vec3 rayOriginLocal = ray.o - cy.c;
+
+    float a = ray.d.y*ray.d.y + ray.d.z*ray.d.z;
+    float b = 2.0 * (ray.d.y * rayOriginLocal.y + ray.d.z * rayOriginLocal.z);
+    float c = rayOriginLocal.y * rayOriginLocal.y + rayOriginLocal.z * rayOriginLocal.z - cy.r * cy.r;
+    float epsilon = 1e-6;
+
+    float delta = b * b - 4.0 * a * c;
+
+    if (delta > 0.0){
+        float t1 = (-b - sqrt(delta)) / (2.0 * a);
+        float t2 = (-b + sqrt(delta)) / (2.0 * a);
+
+        if (t1 > epsilon && (t1 < t2 || t2 < epsilon)){
+
+            float intersectXLocal = ray.d.x * t1 + rayOriginLocal.x;
+            float intersectYLocal = ray.d.y * t1 + rayOriginLocal.y;
+
+            if (intersectXLocal >= -cy.h / 2.0 && intersectXLocal <= cy.h / 2.0){
+
+                vec3 intersectionPointGlobal = vec3(intersectXLocal + cy.c.x, intersectYLocal + cy.c.y, ray.o.z + t1 * ray.d.z);
+
+                h.t = t1;
+                h.n = normalize(vec3(intersectXLocal, intersectYLocal, 0.0));
+                h.i = cy.i;
+
+                return true;
+            }
+        } else if (t2 > epsilon){
+            
+            float intersectXLocal = ray.d.x * t2 + rayOriginLocal.x;
+            float intersectYLocal = ray.d.y * t2 + rayOriginLocal.y;
+
+            if (intersectXLocal >= -cy.h / 2.0 && intersectXLocal <= cy.h / 2.0){
+                
+                vec3 intersectionPointGlobal = vec3(intersectXLocal + cy.c.x, intersectYLocal + cy.c.y, ray.o.z + t1 * ray.d.z);
+
+                h.t = t2;
+                h.n = normalize(vec3(intersectXLocal, intersectYLocal, 0.0));
+                h.i = cy.i;
+
+                return true;
+             }
+            
+        }
+    }
+
+    return false;   
+}
+
+
 // Scene intersection
 // ray : The ray
 //   x : Returned intersection information
@@ -150,6 +210,7 @@ bool Intersect(Ray ray,out Hit x)
     const Sphere sph1=Sphere(vec3(0.,0.,1.),1.,1);
     const Sphere sph2=Sphere(vec3(2.,0.,2.),1.,1);
     const Plane pl=Plane(vec3(0.,0.,1.),vec3(0.,0.,0.),0);
+    const Cylinder cy=Cylinder(vec3(0., 0., 3.), 1., 4., 1);
     
     x=Hit(1000.,vec3(0),-1);
     Hit current;
@@ -164,6 +225,10 @@ bool Intersect(Ray ray,out Hit x)
         ret=true;
     }
     if(IntersectPlane(ray,pl,current)&&current.t<x.t){
+        x=current;
+        ret=true;
+    }
+    if(IntersectCylinder(ray,cy,current)&&current.t<x.t){
         x=current;
         ret=true;
     }
