@@ -4,6 +4,12 @@ struct Sphere{
     int i;// Texture Id
 };
 
+struct Ellipsoid {
+    vec3 c;  // Center
+    vec3 radii;  // Radii along each axis (x, y, z)
+    int i;  // Texture Id
+};
+
 struct Plane{
     vec3 n;// Normal
     vec3 p;// Point
@@ -29,15 +35,17 @@ struct Material
 struct Box{
     vec3 mini;
     vec3 maxi;
+    int i;
 };
 
 struct Cylinder{
-    vec3 c; //center
-    float r; //radius
-    float h; //heigth
+    vec3 c; 
+    float r;
+    float h;
     int i;
     
 };
+
 
 float Checkers(in vec2 p)
 {
@@ -126,7 +134,7 @@ bool IntersectBox(Ray ray, Box box, out Hit x){
         float t1 = (box.maxi[i] - ray.o[i])/ray.d[i];
         
         if(t1 < t0){
-            
+           
             float tmp = t1;
             t1 = t0;
             t0 = tmp;
@@ -142,12 +150,41 @@ bool IntersectBox(Ray ray, Box box, out Hit x){
     }
     
     x.t = tMin;
-    
     x.n = normalize(ray.o + ray.d * tMin - (box.mini + box.maxi) * 0.5);
+    x.i = box.i;
 
 
     return true;
 }
+
+bool IntersectEllipsoid(Ray ray, Ellipsoid ellipsoid, out Hit x) {
+    // Transform the ray into ellipsoid space (inverse scale and translation)
+    vec3 oc = (ray.o - ellipsoid.c) / ellipsoid.radii;
+    vec3 rd = ray.d / ellipsoid.radii;
+
+    float a = dot(rd, rd);
+    float b = dot(oc, rd);
+    float c = dot(oc, oc) - 1.0;
+
+    float discriminant = b * b - a * c;
+
+    if (discriminant > 0.0) {
+        float t1 = (-b - sqrt(discriminant)) / a;
+        float t2 = (-b + sqrt(discriminant)) / a;
+
+        if (t1 > 0.0 || t2 > 0.0) {
+            float t = (t1 > 0.0) ? t1 : t2;
+            vec3 p = Point(ray, t);
+            vec3 normal = normalize(vec3(2.0 * p.x, 2.0 * p.y, 2.0 * p.z));
+            x = Hit(t, normal, ellipsoid.i);
+            return true;
+        }
+    }
+
+    return false;
+}
+
+
 
 bool IntersectCylinder(Ray ray, Cylinder cy, out Hit h){
     vec3 rayOriginLocal = ray.o - cy.c;
@@ -201,16 +238,28 @@ bool IntersectCylinder(Ray ray, Cylinder cy, out Hit h){
 }
 
 
+
 // Scene intersection
 // ray : The ray
 //   x : Returned intersection information
 bool Intersect(Ray ray,out Hit x)
 {
     // Spheres
-    const Sphere sph1=Sphere(vec3(0.,0.,1.),1.,1);
-    const Sphere sph2=Sphere(vec3(2.,0.,2.),1.,1);
+    const Sphere sph1=Sphere(vec3(3.5,0.,3.),1.,1);
+    const Sphere sph2=Sphere(vec3(6.,0.,3.),1.,1);
+    
+    // Plane
     const Plane pl=Plane(vec3(0.,0.,1.),vec3(0.,0.,0.),0);
+    
+    // Box
+    const Box bx=Box(vec3(-2.,3.,1.), vec3(2., 1., 2.), 1);
+    
+    // Cylinder
     const Cylinder cy=Cylinder(vec3(0., 0., 3.), 1., 4., 1);
+    
+    // Ellipsoid 
+    const Ellipsoid ellipsoid = Ellipsoid(vec3(-4., 0., 3.), vec3(1.5, 1.0, 0.5), 1);
+
     
     x=Hit(1000.,vec3(0),-1);
     Hit current;
@@ -224,6 +273,10 @@ bool Intersect(Ray ray,out Hit x)
         x=current;
         ret=true;
     }
+    if(IntersectBox(ray,bx,current)&&current.t<x.t){
+        x=current;
+        ret=true;
+    }
     if(IntersectPlane(ray,pl,current)&&current.t<x.t){
         x=current;
         ret=true;
@@ -232,6 +285,11 @@ bool Intersect(Ray ray,out Hit x)
         x=current;
         ret=true;
     }
+    if (IntersectEllipsoid(ray, ellipsoid, current) && current.t < x.t) {
+        x = current;
+        ret = true;
+    }
+    
     
     return ret;
 }
