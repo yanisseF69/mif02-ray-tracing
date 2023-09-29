@@ -189,53 +189,36 @@ bool IntersectEllipsoid(Ray ray, Ellipsoid ellipsoid, out Hit x) {
 bool IntersectCylinder(Ray ray, Cylinder cy, out Hit h){
     vec3 rayOriginLocal = ray.o - cy.c;
 
-    float a = ray.d.y*ray.d.y + ray.d.z*ray.d.z;
-    float b = 2.0 * (ray.d.y * rayOriginLocal.y + ray.d.z * rayOriginLocal.z);
-    float c = rayOriginLocal.y * rayOriginLocal.y + rayOriginLocal.z * rayOriginLocal.z - cy.r * cy.r;
-    float epsilon = 1e-6;
+    float a = ray.d.x*ray.d.x + ray.d.y*ray.d.y;
+    float b = 2.0 * (ray.d.x * rayOriginLocal.x + ray.d.y * rayOriginLocal.y);
+    float c = rayOriginLocal.x * rayOriginLocal.x + rayOriginLocal.y * rayOriginLocal.y - cy.r * cy.r;
 
     float delta = b * b - 4.0 * a * c;
 
     if (delta > 0.0){
         float t1 = (-b - sqrt(delta)) / (2.0 * a);
         float t2 = (-b + sqrt(delta)) / (2.0 * a);
-
-        if (t1 > epsilon && (t1 < t2 || t2 < epsilon)){
-
-            float intersectXLocal = ray.d.x * t1 + rayOriginLocal.x;
-            float intersectYLocal = ray.d.y * t1 + rayOriginLocal.y;
-
-            if (intersectXLocal >= -cy.h / 2.0 && intersectXLocal <= cy.h / 2.0){
-
-                vec3 intersectionPointGlobal = vec3(intersectXLocal + cy.c.x, intersectYLocal + cy.c.y, ray.o.z + t1 * ray.d.z);
-
-                h.t = t1;
-                h.n = normalize(vec3(intersectXLocal, intersectYLocal, 0.0));
-                h.i = cy.i;
+        float t;
+        
+        if (t1 < t2) t = t1;
+        else t = t2;
+        
+        float intersectXLocal = ray.d.x * t + rayOriginLocal.x;
+        float intersectYLocal = ray.d.y * t + rayOriginLocal.y;
+        float intersectZLocal = ray.d.z * t + rayOriginLocal.z;
+        
+        if (intersectXLocal >= -cy.h / 2.0 && intersectXLocal <= cy.h / 2.0){
+                                
+                vec3 p=Point(ray,t);
+                h=Hit(t,normalize(p-cy.c),cy.i);
 
                 return true;
             }
-        } else if (t2 > epsilon){
-            
-            float intersectXLocal = ray.d.x * t2 + rayOriginLocal.x;
-            float intersectYLocal = ray.d.y * t2 + rayOriginLocal.y;
-
-            if (intersectXLocal >= -cy.h / 2.0 && intersectXLocal <= cy.h / 2.0){
-                
-                vec3 intersectionPointGlobal = vec3(intersectXLocal + cy.c.x, intersectYLocal + cy.c.y, ray.o.z + t1 * ray.d.z);
-
-                h.t = t2;
-                h.n = normalize(vec3(intersectXLocal, intersectYLocal, 0.0));
-                h.i = cy.i;
-
-                return true;
-             }
-            
-        }
     }
 
     return false;   
 }
+
 
 
 
