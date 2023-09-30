@@ -43,8 +43,15 @@ struct Cylinder{
     float r;
     float h;
     int i;
-    
 };
+
+struct Capsule {
+    vec3 start;  // Point de départ d'une extrémité de la pilule
+    vec3 end;    // Point d'arrêt de l'autre extrémité de la pilule
+    float radius; // Rayon de la pilule
+    int i;        // Identifiant de texture de la pilule
+};
+
 
 
 float Checkers(in vec2 p)
@@ -149,9 +156,9 @@ bool IntersectBox(Ray ray, Box box, out Hit x){
         }
     }
     
-    x.t = tMin;
-    x.n = normalize(ray.o + ray.d * tMin - (box.mini + box.maxi) * 0.5);
-    x.i = box.i;
+    vec3 p=Point(ray,tMin);
+    x=Hit(tMin,normalize(p-(box.mini + box.maxi) * 0.5),box.i);
+    
 
 
     return true;
@@ -183,8 +190,6 @@ bool IntersectEllipsoid(Ray ray, Ellipsoid ellipsoid, out Hit x) {
 
     return false;
 }
-
-
 
 bool IntersectCylinder(Ray ray, Cylinder cy, out Hit h){
     vec3 rayOriginLocal = ray.o - cy.c;
@@ -219,6 +224,86 @@ bool IntersectCylinder(Ray ray, Cylinder cy, out Hit h){
     return false;   
 }
 
+// Fonction pour résoudre une équation quadratique ax^2 + bx + c = 0
+bool SolveQuadratic(float a, float b, float c, out float x1, out float x2) {
+    float discriminant = b * b - 4.0 * a * c;
+
+    if (discriminant > 0.0) {
+        float sqrtDiscriminant = sqrt(discriminant);
+        x1 = (-b - sqrtDiscriminant) / (2.0 * a);
+        x2 = (-b + sqrtDiscriminant) / (2.0 * a);
+        return true;  // Deux solutions réelles
+    } else if (discriminant == 0.0) {
+        x1 = -b / (2.0 * a);
+        x2 = x1;
+        return true;  // Une seule solution réelle
+    } else {
+        x1 = 0.0;
+        x2 = 0.0;
+        return false;  // Pas de solution réelle
+    }
+}
+
+
+bool IntersectCapsule(Ray ray, Capsule capsule, out Hit x) {
+    // Intersection avec les sphères aux extrémités
+    Sphere sphere1 = Sphere(capsule.start, capsule.radius, capsule.i);
+    Sphere sphere2 = Sphere(capsule.end, capsule.radius, capsule.i);
+    Hit hit1, hit2;
+    bool intersects1 = IntersectSphere(ray, sphere1, hit1);
+    bool intersects2 = IntersectSphere(ray, sphere2, hit2);
+
+    // Intersection avec le cylindre
+    vec3 dir = capsule.end - capsule.start;
+    float cylinderLength = length(dir);
+    dir = normalize(dir);
+    vec3 oc1 = ray.o - capsule.start;
+    vec3 oc2 = ray.o - capsule.end;
+
+    float b1 = dot(oc1, dir);
+    float b2 = dot(oc2, dir);
+    float c1 = dot(oc1, oc1) - capsule.radius * capsule.radius;
+    float c2 = dot(oc2, oc2) - capsule.radius * capsule.radius;
+
+    float t1, t2;
+    bool intersectsCylinder1 = SolveQuadratic(1.0, 2.0 * b1, c1, t1, t2);
+    bool intersectsCylinder2 = SolveQuadratic(1.0, 2.0 * b2, c2, t1, t2);
+
+    // Trouver la plus proche intersection
+    bool intersectsCylinder = false;
+    float t = 0.0;
+
+    if (intersectsCylinder1 && (t1 > 0.0 && t1 < cylinderLength)) {
+        intersectsCylinder = true;
+        t = t1;
+    }
+    if (intersectsCylinder2 && (t2 > 0.0 && t2 < cylinderLength)) {
+        if (!intersectsCylinder || t2 < t) {
+            intersectsCylinder = true;
+            t = t2;
+        }
+    }
+
+    // Trouver la plus proche intersection parmi toutes les parties de la capsule
+    bool intersects = false;
+    x = Hit(1000.0, vec3(0), -1);
+
+    if (intersects1 && (!intersects || hit1.t < x.t)) {
+        intersects = true;
+        x = hit1;
+    }
+    if (intersects2 && (!intersects || hit2.t < x.t)) {
+        intersects = true;
+        x = hit2;
+    }
+    if (intersectsCylinder && (!intersects || t < x.t)) {
+        intersects = true;
+        x = Hit(t, normalize(Point(ray, t) - (capsule.start + capsule.end) * 0.5), capsule.i);
+    }
+
+    return intersects;
+}
+
 
 
 
@@ -228,8 +313,8 @@ bool IntersectCylinder(Ray ray, Cylinder cy, out Hit h){
 bool Intersect(Ray ray,out Hit x)
 {
     // Spheres
-    const Sphere sph1=Sphere(vec3(3.5,0.,3.),1.,1);
-    const Sphere sph2=Sphere(vec3(6.,0.,3.),1.,1);
+    //const Sphere sph1=Sphere(vec3(3.5,0.,3.),1.,1);
+    const Sphere sph2=Sphere(vec3(3,0.,6.),1.,1);
     
     // Plane
     const Plane pl=Plane(vec3(0.,0.,1.),vec3(0.,0.,0.),0);
@@ -243,14 +328,17 @@ bool Intersect(Ray ray,out Hit x)
     // Ellipsoid 
     const Ellipsoid ellipsoid = Ellipsoid(vec3(-4., 0., 3.), vec3(1.5, 1.0, 0.5), 1);
 
+    //Capsule
+    const Capsule myCapsule = Capsule(vec3(3., 0.0, 3.0), vec3(5.0, 0.0, 3.0), 1., 1);
+
     
     x=Hit(1000.,vec3(0),-1);
     Hit current;
     bool ret=false;
-    if(IntersectSphere(ray,sph1,current)&&current.t<x.t){
+    /*if(IntersectSphere(ray,sph1,current)&&current.t<x.t){
         x=current;
         ret=true;
-    }
+    }*/
     
     if(IntersectSphere(ray,sph2,current)&&current.t<x.t){
         x=current;
@@ -272,7 +360,10 @@ bool Intersect(Ray ray,out Hit x)
         x = current;
         ret = true;
     }
-    
+    if (IntersectCapsule(ray, myCapsule, current) && current.t < x.t) {
+    x = current;
+    ret = true;
+}
     
     return ret;
 }
@@ -337,7 +428,7 @@ void mainImage(out vec4 fragColor,in vec2 fragCoord)
     vec2 mouse=iMouse.xy/iResolution.xy;
     
     // Ray origin
-    vec3 ro=12.*normalize(vec3(sin(2.*3.14*mouse.x),cos(2.*3.14*mouse.x),1.4*(mouse.y-.1)));
+    vec3 ro=20.*normalize(vec3(sin(2.*3.14*mouse.x),cos(2.*3.14*mouse.x),1.4*(mouse.y-.1)));
     vec3 ta=vec3(0.,0.,1.5);
     mat3 ca=setCamera(ro,ta);
     
@@ -348,4 +439,6 @@ void mainImage(out vec4 fragColor,in vec2 fragCoord)
     vec3 col=Shade(Ray(ro,rd));
     
     fragColor=vec4(col,1.);
+  
+
 }
