@@ -271,7 +271,7 @@ bool Intersect(Ray ray, out Hit x) {
     const Cylinder cy = Cylinder(vec3(0., 0., 3.), 1., 4., 1);
 
     // Ellipsoid 
-    const Ellipsoid ellipsoid = Ellipsoid(vec3(-4., 0., 3.), vec3(1.5, 1.0, 0.5), 1);
+    const Ellipsoid ellipsoid = Ellipsoid(vec3(-3., 0., 3.5), vec3(1.5, 1.0, 0.5), 1);
 
     // Torus 
     Torus torus = Torus(vec3(3., 0., 7.0), abs(vec2(1.0, 0.5)*cos(iTime)), 1);
