@@ -1,8 +1,4 @@
-struct Sphere {
-    vec3 c; // Center
-    float r; // Radius
-    int i; // Texture Id
-};
+
 
 struct Ellipsoid {
     vec3 c; // Center
@@ -90,25 +86,6 @@ Material Texture(vec3 p, int i) {
         return Material(col);
     }
     return Material(vec3(0));
-}
-
-// Sphere intersection
-// ray : The ray
-//   x : Returned intersection information
-bool IntersectSphere(Ray ray, Sphere sph, out Hit x) {
-    vec3 oc = ray.o - sph.c;
-    float b = dot(oc, ray.d);
-    float c = dot(oc, oc) - sph.r * sph.r;
-    float d = b * b - c;
-    if (d > 0.) {
-        float t = -b - sqrt(d);
-        if (t > 0.) {
-            vec3 p = Point(ray, t);
-            x = Hit(t, normalize(p - sph.c), sph.i);
-            return true;
-        }
-    }
-    return false;
 }
 
 // Plane intersection
@@ -282,15 +259,13 @@ bool IntersectCapsule(Ray ray, Capsule cap, out Hit x) {
 // ray : The ray
 //   x : Returned intersection information
 bool Intersect(Ray ray, out Hit x) {
-    // Spheres
-    Sphere sph1 = Sphere(vec3(3.5, 0., 3.), 1., 0);
-    Sphere sph2 = Sphere(vec3(6., 0., 3.), 1., 1);
+
 
     // Plane
     const Plane pl = Plane(vec3(0., 0., 1.), vec3(0., 0., 0.), 0);
 
     // Box
-    Box bx = Box(vec3(2., 3., 1.), vec3(6., 1., 2.), 1);
+    Box bx = Box(vec3(3., 6., 1.), vec3(7., 3., 2.), 1);
 
     // Cylinder
     const Cylinder cy = Cylinder(vec3(0., 0., 3.), 1., 4., 1);
@@ -307,36 +282,33 @@ bool Intersect(Ray ray, out Hit x) {
     x = Hit(1000., vec3(0), -1);
     Hit current;
     bool ret = false;
-    if (IntersectSphere(ray, sph1, current) && current.t < x.t) {
-        x = current;
-        ret = true;
-    }
 
-    if (IntersectSphere(ray, sph2, current) && current.t < x.t) {
-        x = current;
-        ret = true;
-    }
 
     if (IntersectPlane(ray, pl, current) && current.t < x.t) {
         x = current;
         ret = true;
     }
 
-    // Calculate rotation angle for the box
-    float rotationAngle = iTime; // Adjust the rotation speed as needed
-    mat2 rotationMatrix = mat2(
-        cos(rotationAngle), -sin(rotationAngle),
-        sin(rotationAngle), cos(rotationAngle)
-    );
+// Define an array of 4 points
+vec2 points[4];
+points[0] = vec2(5.0, 5.0);
+points[1] = vec2(5.0, -5.0);
+points[2] = vec2(-5.0, -5.0);
+points[3] = vec2(-5.0, 5.0);
 
-    // Apply rotation to the box vertices
-    vec2 boxVertices = vec2(bx.mini.x, bx.mini.y);
-    bx.mini.xy = rotationMatrix * (boxVertices - cy.c.xy) + cy.c.xy;
+// Calculate the current index and interpolation factor based on time
+float cycleTime = 4.0; // Time to complete one cycle
+float t = mod(iTime, cycleTime) / cycleTime;
+int currentIndex = int(floor(t * 4.0));
+float interpFactor = fract(t * 4.0);
 
-    boxVertices = vec2(bx.maxi.x, bx.maxi.y);
-    //bx.maxi.xy = rotationMatrix * (boxVertices - cy.c.xy) + cy.c.xy;
-    bx.maxi.xy = bx.mini.xy + vec2(3.5, 3.5);
-    
+// Interpolate between the current and next points
+vec2 currentPoint = mix(points[currentIndex], points[(currentIndex + 1) % 4], interpFactor);
+
+// Apply translation to the box vertices
+vec2 translation = currentPoint - points[0]; // Calculate the translation relative to the first point
+bx.mini.xy += translation;
+bx.maxi.xy += translation;
     ////////////////////////////////////////////////////////////////////
     
     // Calculate rotation angle for sph1 around the Z-axis
