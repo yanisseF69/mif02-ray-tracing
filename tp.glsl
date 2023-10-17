@@ -289,26 +289,26 @@ bool Intersect(Ray ray, out Hit x) {
         ret = true;
     }
 
-// Define an array of 4 points
-vec2 points[4];
-points[0] = vec2(5.0, 5.0);
-points[1] = vec2(5.0, -5.0);
-points[2] = vec2(-5.0, -5.0);
-points[3] = vec2(-5.0, 5.0);
+    // Define an array of 4 points
+    vec2 points[4];
+    points[0] = vec2(5.0, 5.0);
+    points[1] = vec2(5.0, -5.0);
+    points[2] = vec2(-5.0, -5.0);
+    points[3] = vec2(-5.0, 5.0);
 
-// Calculate the current index and interpolation factor based on time
-float cycleTime = 4.0; // Time to complete one cycle
-float t = mod(iTime, cycleTime) / cycleTime;
-int currentIndex = int(floor(t * 4.0));
-float interpFactor = fract(t * 4.0);
+    // Calculate the current index and interpolation factor based on time
+    float cycleTime = -4.0; // Time to complete one cycle
+    float t = mod(iTime, cycleTime) / cycleTime;
+    int currentIndex = int(floor(t * 4.0));
+    float interpFactor = fract(t * 4.0);
 
-// Interpolate between the current and next points
-vec2 currentPoint = mix(points[currentIndex], points[(currentIndex + 1) % 4], interpFactor);
+    // Interpolate between the current and next points
+    vec2 currentPoint = mix(points[currentIndex], points[(currentIndex + 1) % 4], interpFactor);
 
-// Apply translation to the box vertices
-vec2 translation = currentPoint - points[0]; // Calculate the translation relative to the first point
-bx.mini.xy += translation;
-bx.maxi.xy += translation;
+    // Apply translation to the box vertices
+    vec2 translation = currentPoint - points[0]; // Calculate the translation relative to the first point
+    bx.mini.xy += translation;
+    bx.maxi.xy += translation;
     ////////////////////////////////////////////////////////////////////
     
     // Calculate rotation angle for sph1 around the Z-axis
