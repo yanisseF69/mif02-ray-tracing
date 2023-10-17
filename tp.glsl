@@ -274,14 +274,14 @@ bool Intersect(Ray ray, out Hit x) {
     const Ellipsoid ellipsoid = Ellipsoid(vec3(-4., 0., 3.), vec3(1.5, 1.0, 0.5), 1);
 
     // Torus 
-    const Torus torus = Torus(vec3(-8., 0., 3.0), vec2(1.0, 0.5), 1);
+    Torus torus = Torus(vec3(3., 0., 7.0), abs(vec2(1.0, 0.5)*cos(iTime)), 1);
 
     // Capsule 
     Capsule capsule = Capsule(vec3(-3., 0., 5.), vec3(-6., 0., 5.), 0.5, 1);
 
     x = Hit(1000., vec3(0), -1);
-    Hit current;
     bool ret = false;
+    Hit current;
 
 
     if (IntersectPlane(ray, pl, current) && current.t < x.t) {
@@ -322,6 +322,9 @@ bool Intersect(Ray ray, out Hit x) {
     sph2.c = rotationMatrixSphere * sph2.c; // Apply rotation to sph1 position */
     
     ////////////////////////////////////////////////////////////////////
+    
+    // Torus homothétie
+
     
     // Calculate rotation angle for the capsule around the Z-axis
     float rotationAngleCapsule = iTime; // Adjust the rotation speed as needed
@@ -418,7 +421,7 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     vec2 mouse = iMouse.xy / iResolution.xy;
 
     // Ray origin
-    vec3 ro = 20. * normalize(vec3(sin(2. * 3.14 * mouse.x), cos(2. * 3.14 * mouse.x), 1.4 * (mouse.y - .1)));
+    vec3 ro = 25. * normalize(vec3(sin(2. * 3.14 * mouse.x), cos(2. * 3.14 * mouse.x), 1.4 * (mouse.y - .1)));
     vec3 ta = vec3(0., 0., 1.5);
     mat3 ca = setCamera(ro, ta);
 
