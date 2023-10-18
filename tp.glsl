@@ -67,6 +67,12 @@ vec3 Point(Ray ray, float t) {
     return ray.o + t * ray.d;
 }
 
+int convert(float x)
+{
+    if(x < 0.0) x--;
+    return int(x);
+}
+
 // Compute color
 // i : Texture index
 // p : Point
@@ -78,7 +84,16 @@ Material Texture(vec3 p, int i) {
         float f = Checkers(.5 * p.xy);
         vec3 col = vec3(.4, .5, .7) + f * vec3(.1);
         return Material(col);
-    } else if (i == 2) {
+    } else if(i == 2){
+        vec3 noir = vec3(0., 0., 0.);
+        vec3 blanc = vec3(1., 1., 1.);
+
+        int x = convert(p.x);
+        int y = convert(p.y);
+        int z = convert(p.z);
+        if ((x+y+z)%2 == 0) return Material(noir);
+        else return Material(blanc);
+    } else {
         // Sample from the uniform sampler iChannel0 using the texture coordinates
         vec2 texCoord = p.xy;
         float f = texture(iChannel0, texCoord).r;
@@ -268,7 +283,7 @@ bool Intersect(Ray ray, out Hit x) {
     Box bx = Box(vec3(3., 6., 1.), vec3(7., 3., 2.), 1);
 
     // Cylinder
-    const Cylinder cy = Cylinder(vec3(0., 0., 3.), 1., 4., 1);
+    const Cylinder cy = Cylinder(vec3(0., 0., 3.), 1., 4., 2);
 
     // Ellipsoid 
     const Ellipsoid ellipsoid = Ellipsoid(vec3(-3., 0., 3.5), vec3(1.5, 1.0, 0.5), 1);
