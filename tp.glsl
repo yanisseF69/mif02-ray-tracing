@@ -1,5 +1,4 @@
 
-
 struct Ellipsoid {
     vec3 c; // Center
     vec3 radii; // Radii along each axis (x, y, z)
@@ -24,7 +23,7 @@ struct Ray {
 };
 
 struct Material {
-    vec3 d; // Diffuse
+    vec3 a, d, s; 
 };
 
 struct Box {
@@ -76,31 +75,60 @@ int convert(float x)
 // Compute color
 // i : Texture index
 // p : Point
-Material Texture(vec3 p, int i) {
+Material Texture(Ray ray, vec3 p, int i) {
+    
+    Material res;
+    res.a = vec3(.1, .1, .1);
+    res.s = vec3(1.0, 1, 1.);
+
     if (i == 1) {
-        return Material(vec3(.8, .5, .4));
+        res.d = vec3(.8, .5, .4);
+        return res;
     } else if (i == 0) {
-        // compute checkboard
+
         float f = Checkers(.5 * p.xy);
-        vec3 col = vec3(.4, .5, .7) + f * vec3(.1);
-        return Material(col);
-    } else if(i == 2){
+        Material mat;
+        res.d = vec3(.4, .5, .7) + f * vec3(.1);
+        return res;
+    } else if (i == 2) {
+        
         vec3 noir = vec3(0., 0., 0.);
         vec3 blanc = vec3(1., 1., 1.);
 
         int x = convert(p.x);
         int y = convert(p.y);
         int z = convert(p.z);
-        if ((x+y+z)%2 == 0) return Material(noir);
-        else return Material(blanc);
+
+        if ((x + y + z) % 2 == 0) {
+            res.d = noir;
+            return res;
+        } else {
+        
+            res.d = blanc; // Couleur diffuse
+            return res;
+            }
+    } else if (i == 3) {
+        // Compute water effect with deformations
+        vec2 uv = 0.5 * p.xy; // Scale down the input coordinates
+
+        // Deform the UV coordinates with sine waves
+        float time = iTime; // Assuming you have a uniform called iTime for animation
+        uv.x += 0.1 * sin(uv.y * 10.0 + time * 2.0);
+        uv.y += 0.1 * sin(uv.x * 10.0 + time * 2.0);
+
+        res.d = vec3(0.0, 0.3, 0.7) + 0.1 * sin(uv.x * 10.0) + 0.1 * sin(uv.y * 10.0);
+        return res;
     } else {
         // Sample from the uniform sampler iChannel0 using the texture coordinates
         vec2 texCoord = p.xy;
         float f = texture(iChannel0, texCoord).r;
-        vec3 col = vec3(.4, .5, .7) + f * vec3(.1);
-        return Material(col);
+
+        res.d = vec3(.4, .5, .7) + f * vec3(.1);
+        return res;
     }
-    return Material(vec3(0));
+    
+    res.d = vec3(0.0);
+    return res;
 }
 
 // Plane intersection
@@ -402,11 +430,25 @@ mat3 setCamera(in vec3 ro, in vec3 ta) {
 // Apply color model
 // m : Material
 // n : normal
-vec3 Color(Material m, vec3 n) {
-    vec3 light = normalize(vec3(1, 1, 1));
+vec3 Color(Material m, vec3 n, vec3 v)
+{
+    vec3 lightDir = normalize(vec3(1, 1, 1));
+    vec3 viewDir = normalize(v);
+    vec3 reflectionDir = reflect(-lightDir, n);
+    
+    float diff = max(dot(n, lightDir), 0.0);
+    float spec = 0.0;
+    
+    if (diff > 0.0) {
+        spec = pow(max(dot(viewDir, reflectionDir), 0.0), 32.0);
+    }
+    
+    vec3 ambient = m.a;
+    vec3 diffuse = m.d * diff;
+    vec3 specular = m.s * spec;
 
-    float diff = clamp(dot(n, light), 0., 1.);
-    vec3 col = m.d * diff + vec3(.2, .2, .2);
+    vec3 col = ambient + diffuse + specular;
+    
     return col;
 }
 
