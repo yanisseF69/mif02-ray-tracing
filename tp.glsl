@@ -1,4 +1,3 @@
-
 struct Ellipsoid {
     vec3 c; // Center
     vec3 radii; // Radii along each axis (x, y, z)
@@ -460,15 +459,30 @@ vec3 Shade(Ray ray) {
 
     if (idx) {
         vec3 p = Point(ray, x.t);
-        Material mat = Texture(p, x.i);
+        Material mat = Texture(ray, p, x.i);
+        vec3 lightDir = normalize(vec3(1., 1., 1.));
+        Ray shadowRay;
+        shadowRay.o = p + 0.001 * lightDir; // Offset the origin slightly to avoid self-intersection
+        shadowRay.d = lightDir;
 
-        return Color(mat, x.n);
+        Hit shadowHit;
+        
+        bool shadow = (Intersect(shadowRay, shadowHit) && shadowHit.t >= length(lightDir));
+        
+        if (shadow) {
+            // In shadow, return ambient color only
+            return mat.a;
+        } else {
+            // Not in shadow, calculate and return object's color
+            return Color(mat, x.n, p);
+        }
     } else {
         return Background(ray.d);
     }
 
     return vec3(0);
 }
+
 
 void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     // From uv which are the pixel coordinates in [0,1], change to [-1,1] and apply aspect ratio
