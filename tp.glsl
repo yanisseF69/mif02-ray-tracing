@@ -5,9 +5,12 @@ struct Ellipsoid {
 };
 
 struct Plane {
-    vec3 n; // Normal
-    vec3 p; // Point
-    int i; // Texture Id
+    vec3 n;        // Normal
+    vec3 p;        // Point
+    int i;         // Texture Id
+    float amplitude;
+    float frequency;
+    float speed;
 };
 
 struct Hit {
@@ -71,6 +74,10 @@ int convert(float x)
     return int(x);
 }
 
+
+
+
+
 // Compute color
 // i : Texture index
 // p : Point
@@ -130,13 +137,22 @@ Material Texture(Ray ray, vec3 p, int i) {
     return res;
 }
 
+
 // Plane intersection
 // ray : The ray
 //   x : Returned intersection information
 bool IntersectPlane(Ray ray, Plane pl, out Hit x) {
     float t = -dot(ray.o - pl.p, pl.n) / dot(ray.d, pl.n);
-    if (t > 0.) {
-        x = Hit(t, vec3(0, 0, 1), 0);
+    if (t > 0. && t < 1000.0) {
+        // Introduce waves that move with time
+        float waveHeight = pl.amplitude * sin(pl.frequency * t + pl.speed * iTime);
+
+        // Modify the plane's position based on the wave
+        vec3 wavePosition = pl.p + pl.n * waveHeight;
+
+        x = Hit(t, pl.n, pl.i);
+        x.n = pl.n;
+        x.n.y = waveHeight;  // Adjust the normal to account for the wave
         return true;
     }
     return false;
@@ -177,24 +193,26 @@ bool IntersectBox(Ray ray, Box box, out Hit x) {
 }
 
 bool IntersectEllipsoid(Ray ray, Ellipsoid ellipsoid, out Hit x) {
-    // Transform the ray into ellipsoid space (inverse scale and translation)
-    vec3 oc = (ray.o - ellipsoid.c) / ellipsoid.radii;
-    vec3 rd = ray.d / ellipsoid.radii;
+    vec3 oc = ray.o - ellipsoid.c;  // Translate ray origin
+    oc /= ellipsoid.radii;  // Scale by radii
 
-    float a = dot(rd, rd);
-    float b = dot(oc, rd);
+    vec3 d = ray.d / ellipsoid.radii;  // Scale ray direction
+
+    float a = dot(d, d);
+    float b = 2.0 * dot(oc, d);
     float c = dot(oc, oc) - 1.0;
 
-    float discriminant = b * b - a * c;
+    float discriminant = b * b - 4.0 * a * c;
 
     if (discriminant > 0.0) {
-        float t1 = (-b - sqrt(discriminant)) / a;
-        float t2 = (-b + sqrt(discriminant)) / a;
+        float t1 = (-b - sqrt(discriminant)) / (2.0 * a);
+        float t2 = (-b + sqrt(discriminant)) / (2.0 * a);
 
         if (t1 > 0.0 || t2 > 0.0) {
             float t = (t1 > 0.0) ? t1 : t2;
-            vec3 p = Point(ray, t);
-            vec3 normal = normalize(vec3(2.0 * p.x, 2.0 * p.y, 2.0 * p.z));
+            vec3 p = ray.o + t * ray.d;
+            vec3 normal = normalize(2.0 * (p - ellipsoid.c));
+
             x = Hit(t, normal, ellipsoid.i);
             return true;
         }
@@ -224,11 +242,11 @@ bool IntersectCylinder(Ray ray, Cylinder cy, out Hit h) {
         float intersectYLocal = ray.d.y * t + rayOriginLocal.y;
         float intersectZLocal = ray.d.z * t + rayOriginLocal.z;
 
-        if (intersectXLocal >= -cy.h / 2.0 && intersectXLocal <= cy.h / 2.0) {
+        //if (intersectZLocal > -cy.h && intersectZLocal < cy.h ) {
             vec3 p = Point(ray, t);
             h = Hit(t, normalize(p - cy.c), cy.i);
             return true;
-        }
+        //}
     }
 
     return false;
@@ -304,16 +322,16 @@ bool Intersect(Ray ray, out Hit x) {
 
 
     // Plane
-    const Plane pl = Plane(vec3(0., 0., 1.), vec3(0., 0., 0.), 0);
+    Plane pl = Plane(vec3(0., 0., 1.), vec3(0., 0., 0.), 3, 0.25, 5.0, 2.5);
 
     // Box
-    Box bx = Box(vec3(3., 6., 1.), vec3(7., 3., 2.), 1);
+    Box bx = Box(vec3(3., 6., 2.), vec3(7., 3., 4.), 1);
 
     // Cylinder
     const Cylinder cy = Cylinder(vec3(0., 0., 3.), 1., 4., 2);
 
     // Ellipsoid 
-    const Ellipsoid ellipsoid = Ellipsoid(vec3(-3., 0., 3.5), vec3(1.5, 1.0, 0.5), 1);
+    const Ellipsoid ellipsoid = Ellipsoid(vec3(-5., 0., 7.5), vec3(3., 2., 2.), 1);
 
     // Torus 
     Torus torus = Torus(vec3(3., 0., 7.0), abs(vec2(1.0, 0.5)*cos(iTime)), 1);
@@ -451,6 +469,8 @@ vec3 Color(Material m, vec3 n, vec3 v)
     return col;
 }
 
+
+
 // Rendering
 vec3 Shade(Ray ray) {
     // Intersect contains all the geo detection
@@ -467,7 +487,7 @@ vec3 Shade(Ray ray) {
 
         Hit shadowHit;
         
-        bool shadow = (Intersect(shadowRay, shadowHit) && shadowHit.t >= length(lightDir));
+        bool shadow = (Intersect(shadowRay, shadowHit) && shadowHit.t > length(lightDir));
         
         if (shadow) {
             // In shadow, return ambient color only
@@ -482,6 +502,9 @@ vec3 Shade(Ray ray) {
 
     return vec3(0);
 }
+
+
+
 
 
 void mainImage(out vec4 fragColor, in vec2 fragCoord) {
@@ -504,3 +527,4 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
 
     fragColor = vec4(col, 1.);
 }
+
