@@ -1,3 +1,9 @@
+struct Sphere{
+    vec3 c;// Center
+    float r;// Radius
+    int i;// Texture Id
+};
+
 struct Ellipsoid {
     vec3 c; // Center
     vec3 radii; // Radii along each axis (x, y, z)
@@ -26,6 +32,7 @@ struct Ray {
 
 struct Material {
     vec3 a, d, s; 
+    float t; // transparency
 };
 
 struct Box {
@@ -75,6 +82,49 @@ int convert(float x)
 }
 
 
+float random(vec2 st) {
+    return fract(sin(dot(st.xy, vec2(12.9898, 78.233)) * 43758.5453123));
+}
+
+float noise(vec2 st) {
+    vec2 i = floor(st);
+    vec2 f = fract(st);
+    
+    // Smoothstep function for smooth interpolation
+    f = f * f * (3.0 - 2.0 * f);
+    
+    float a = random(i);
+    float b = random(i + vec2(1.0, 0.0));
+    float c = random(i + vec2(0.0, 1.0));
+    float d = random(i + vec2(1.0, 1.0));
+    
+    float mix1 = mix(a, b, f.x);
+    float mix2 = mix(c, d, f.x);
+    
+    return mix(mix1, mix2, f.y);
+}
+
+float turbulence(vec2 st, int octaves) {
+    float value = 0.0;
+    float amplitude = 1.0;
+    for (int i = 0; i < octaves; i++) {
+        value += amplitude * noise(st);
+        st *= 2.0; // Increase the frequency
+        amplitude *= 0.5; // Decrease the amplitude
+    }
+    return value;
+}
+
+float woodPattern(vec2 st) {
+    // Define the scale of the wood grain
+    float scale = 8.0;
+
+    // Calculate the noise value
+    float n = noise(st * scale);
+
+    // Apply a sinusoidal function to create wood-like rings
+    return abs(sin(n * 2.0 * 3.1415));
+}
 
 
 
@@ -124,7 +174,39 @@ Material Texture(Ray ray, vec3 p, int i) {
 
         res.d = vec3(0.0, 0.3, 0.7) + 0.1 * sin(uv.x * 10.0) + 0.1 * sin(uv.y * 10.0);
         return res;
-    } else {
+    } else if (i == 4) {
+        // The transparent object
+        res.t = 1.; 
+        return res;
+     } else if (i == 5) {
+     // Define the scale and frequency of the marble texture
+        float scale = 8.0;
+        int octaves = 5;
+
+        // Calculate the turbulence value
+        float t = turbulence(p.xy * scale, octaves);
+
+        // Define the marble colors
+        vec3 darkColor = vec3(0.1, 0.1, 0.1);
+        vec3 lightColor = vec3(1.0, 1.0, 1.0);
+
+        // Mix the colors based on the turbulence
+        res.d = mix(darkColor, lightColor, t);
+        return res;
+     
+     } else if (i == 6) {
+     // Generate a wood grain pattern
+        float woodGrain = woodPattern(p.xy);
+
+        // Define the wood colors
+        vec3 lightColor = vec3(0.6, 0.3, 0.1);
+        vec3 darkColor = vec3(0.3, 0.1, 0.05);
+
+        // Mix the colors based on the wood grain pattern
+        res.d = mix(darkColor, lightColor, woodGrain);
+        return res;
+     
+     } else {
         // Sample from the uniform sampler iChannel0 using the texture coordinates
         vec2 texCoord = p.xy;
         float f = texture(iChannel0, texCoord).r;
@@ -135,6 +217,31 @@ Material Texture(Ray ray, vec3 p, int i) {
     
     res.d = vec3(0.0);
     return res;
+}
+
+
+// Sphere intersection
+// ray : The ray
+//   x : Returned intersection information
+bool IntersectSphere(Ray ray,Sphere sph,out Hit x)
+{
+    vec3 oc=ray.o-sph.c;
+    float b=dot(oc,ray.d);
+    float c=dot(oc,oc)-sph.r*sph.r;
+    float d=b*b-c;
+    if(d>0.)
+    {
+        float t=-b-sqrt(d);
+        if(t>0.)
+        {
+            vec3 p=Point(ray,t);
+            x=Hit(t,normalize(p-sph.c),sph.i);
+            
+            return true;
+        }
+    }
+    return false;
+    
 }
 
 
@@ -324,11 +431,15 @@ bool Intersect(Ray ray, out Hit x) {
     // Plane
     Plane pl = Plane(vec3(0., 0., 1.), vec3(0., 0., 0.), 3, 0.25, 5.0, 2.5);
 
+    
+    // Sphere
+    Sphere s = Sphere(vec3(7., -7., 7), 3., 1);
+
     // Box
     Box bx = Box(vec3(3., 6., 2.), vec3(7., 3., 4.), 1);
 
     // Cylinder
-    const Cylinder cy = Cylinder(vec3(0., 0., 3.), 1., 4., 2);
+    const Cylinder cy = Cylinder(vec3(0., 0., 3.), 1., 4., 6);
 
     // Ellipsoid 
     const Ellipsoid ellipsoid = Ellipsoid(vec3(-5., 0., 7.5), vec3(3., 2., 2.), 1);
@@ -366,28 +477,13 @@ bool Intersect(Ray ray, out Hit x) {
     vec2 currentPoint = mix(points[currentIndex], points[(currentIndex + 1) % 4], interpFactor);
 
     // Apply translation to the box vertices
-    vec2 translation = currentPoint - points[0]; // Calculate the translation relative to the first point
+    vec2 translation = currentPoint - points[0]; 
     bx.mini.xy += translation;
     bx.maxi.xy += translation;
-    ////////////////////////////////////////////////////////////////////
-    
-    // Calculate rotation angle for sph1 around the Z-axis
-    /*float rotationAngleSphere = iTime; // Adjust the rotation speed as needed
-    mat3 rotationMatrixSphere = mat3(
-        cos(rotationAngleSphere), -sin(rotationAngleSphere), 0.0,
-        sin(rotationAngleSphere), cos(rotationAngleSphere), 0.0,
-        0.0, 0.0, 1.0
-    );
 
-    sph2.c = rotationMatrixSphere * sph2.c; // Apply rotation to sph1 position */
-    
-    ////////////////////////////////////////////////////////////////////
     
     // Torus homothétie
-
-    
-    // Calculate rotation angle for the capsule around the Z-axis
-    float rotationAngleCapsule = iTime; // Adjust the rotation speed as needed
+    float rotationAngleCapsule = iTime;
     mat2 rotationMatrixCapsule = mat2(
         cos(rotationAngleCapsule), -sin(rotationAngleCapsule),
         sin(rotationAngleCapsule), cos(rotationAngleCapsule)
@@ -401,7 +497,10 @@ bool Intersect(Ray ray, out Hit x) {
 
 
 
-
+    if (IntersectSphere(ray, s, current) && current.t < x.t) {
+        x = current;
+        ret = true;
+    }
     if (IntersectBox(ray, bx, current) && current.t < x.t) {
         x = current;
         ret = true;
@@ -470,44 +569,127 @@ vec3 Color(Material m, vec3 n, vec3 v)
 }
 
 
+// Hemisphere direction
+vec3 Hemisphere(int seed,vec3 n)
 
-// Rendering
-vec3 Shade(Ray ray) {
-    // Intersect contains all the geo detection
-    Hit x;
-    bool idx = Intersect(ray, x);
+{
 
-    if (idx) {
-        vec3 p = Point(ray, x.t);
-        Material mat = Texture(ray, p, x.i);
-        vec3 lightDir = normalize(vec3(1., 1., 1.));
-        Ray shadowRay;
-        shadowRay.o = p + 0.001 * lightDir; // Offset the origin slightly to avoid self-intersection
-        shadowRay.d = lightDir;
+    float a=fract(sin(176.19*float(seed)));// Uniform randoms
+    float b=fract(sin(164.19*float(seed)));
 
-        Hit shadowHit;
-        
-        bool shadow = (Intersect(shadowRay, shadowHit) && shadowHit.t > length(lightDir));
-        
-        if (shadow) {
-            // In shadow, return ambient color only
-            return mat.a;
-        } else {
-            // Not in shadow, calculate and return object's color
-            return Color(mat, x.n, p);
-        }
-    } else {
-        return Background(ray.d);
+    float u=2.*3.1415*a;// Random angle
+    float v=acos(2.*b-1.);// Arcosine distribution to compensate for poles
+
+    vec3 d=vec3(cos(u)*cos(v),sin(u)*cos(v),sin(v));// Direction
+
+    if(dot(d,n)<0.){d=-d;}// Hemishpere
+
+    return d;
+
+}
+
+// Ambient occlusion
+// p : Point
+// n : Normal
+// N : Number of samples
+float AmbientOcclusion(vec3 p, vec3 n, int N)
+{
+    if (N == 0) {
+        return 1.0;
     }
 
-    return vec3(0);
+    float ao = 0.0;
+
+    for (int i = 0; i < N; i++)
+    {
+        // Generate a random direction in the hemisphere
+        vec3 d = Hemisphere(i, n);
+
+        // Create a shadow ray from the point of intersection with an offset along the normal
+        vec3 offsetPoint = p + n;
+        Ray shadowRay;
+        shadowRay.o = offsetPoint;
+        shadowRay.d = d;
+
+        // Check if the shadow ray intersects any objects
+        Hit shadowHit;
+        bool shadow = Intersect(shadowRay, shadowHit);
+
+        // If there is no intersection or the intersection is far enough, accumulate occlusion
+        if (!shadow || shadowHit.t > length(p - shadowRay.o)) {
+            ao += 1.0;
+        }
+    }
+
+    // Normalize the accumulated occlusion factor
+    ao /= float(N);
+
+    return ao;
 }
 
 
 
 
 
+// Rendering
+vec3 Shade(Ray ray) {
+    int maxDepth = 2; // Maximum reflection depth
+    vec3 color = vec3(0.0);
+
+    for (int depth = 0; depth < maxDepth; depth++) {
+        Hit x;
+        bool idx = Intersect(ray, x);
+
+        if (idx) {
+            vec3 p = Point(ray, x.t);
+            Material mat = Texture(ray, p, x.i);
+            vec3 lightDir = normalize(vec3(1., 1., 1.));
+            Ray shadowRay;
+            shadowRay.o = p + 0.001 * lightDir; // Offset the origin slightly to avoid self-intersection
+            shadowRay.d = lightDir;
+
+            Hit shadowHit;
+
+            bool shadow = (Intersect(shadowRay, shadowHit) && shadowHit.t > length(lightDir));
+
+            if (shadow) {
+                // In shadow, return ambient color only
+                color += mat.a;
+                break; // Exit the loop if in shadow
+            }
+
+            if (mat.t > 0.0) {
+                // Calculate the reflected ray direction
+                vec3 reflectionDir = reflect(ray.d, x.n);
+
+                // Create a reflected ray
+                Ray reflectedRay;
+                reflectedRay.o = p + 0.001 * reflectionDir; // Offset to avoid self-intersection
+                reflectedRay.d = reflectionDir;
+
+                // Trace the reflected ray and accumulate the color
+                color += mat.d * (1.0 - mat.t);
+                ray = reflectedRay; // Update the ray for the next iteration
+            } else {
+                // Calculate object's color with ambient occlusion
+                float ao = AmbientOcclusion(p, x.n, 0); // Adjust the number of samples as needed
+                // Apply the occlusion factor to the color
+                color += Color(mat, x.n, p) * ao;
+                break; // Exit the loop if not transparent
+            }
+        } else {
+            // No intersection, return the background color
+            color += Background(ray.d);
+            break; // Exit the loop if no intersection
+        }
+    }
+
+    return color;
+}
+
+
 void mainImage(out vec4 fragColor, in vec2 fragCoord) {
+
     // From uv which are the pixel coordinates in [0,1], change to [-1,1] and apply aspect ratio
     vec2 uv = (-iResolution.xy + 2. * fragCoord.xy) / iResolution.y;
 
